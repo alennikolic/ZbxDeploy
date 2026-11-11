@@ -19,13 +19,15 @@ INSERT INTO zabbix_versions
      sql_scripts_path, template_dir, is_lts, is_supported, is_default,
      eol_full_support, notes)
 VALUES
+    -- Note the path: 7.0 predates the /release/ segment and the version suffix
+    -- in the filename that 7.2+ use. Do not "normalise" these URLs by hand.
     ('7.0', 'ubuntu', 'noble', '24.04',
-     'https://repo.zabbix.com/zabbix/7.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu24.04_all.deb',
+     'https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu24.04_all.deb',
      '/usr/share/zabbix-sql-scripts/mysql/server.sql.gz', '7.0', 1, 1, 1,
      '2027-06-30', 'Primary target. LTS, limited support until 2029-06-30.'),
 
     ('7.0', 'ubuntu', 'jammy', '22.04',
-     'https://repo.zabbix.com/zabbix/7.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu22.04_all.deb',
+     'https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu22.04_all.deb',
      '/usr/share/zabbix-sql-scripts/mysql/server.sql.gz', '7.0', 1, 1, 0,
      '2027-06-30', 'For existing 22.04 fleets.'),
 
