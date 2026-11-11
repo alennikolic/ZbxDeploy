@@ -44,6 +44,9 @@
 - name: Update the apt cache
   ansible.builtin.apt:
     update_cache: true
+    # Force a refresh when the repository was just registered, otherwise let a
+    # recent cache stand - so a repeat run reports "ok" instead of "changed".
+    cache_valid_time: "{{ 0 if zbx_release_pkg.changed else 3600 }}"
   become: true
   register: zbx_apt_update
   # A failure here is expected often enough to be worth handling rather than
