@@ -112,5 +112,12 @@
 - name: Report the repository state
   ansible.builtin.debug:
     msg: >-
-      {{ inventory_hostname }}: Zabbix {{ zbx_version }} repository ready,
-      {{ zbx_probe_package }} candidate {{ zbx_candidate.stdout | trim | default('unknown') }}
+      {{ inventory_hostname }}:
+      {% if ansible_check_mode %}
+      check mode - the Zabbix {{ zbx_version }} release package was only simulated,
+      so apt still offers no {{ zbx_probe_package }}. That is expected here;
+      run this again without the dry run to register the repository for real.
+      {% else %}
+      Zabbix {{ zbx_version }} repository ready,
+      {{ zbx_probe_package }} candidate {{ zbx_candidate.stdout | trim }}.
+      {% endif %}
