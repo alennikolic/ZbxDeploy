@@ -1,0 +1,115 @@
+---
+# Register the official Zabbix apt repository.
+#
+# The release package URL comes from ZbxDeploy's version matrix, so this role
+# never has to know which Zabbix release or which Ubuntu codename it is dealing
+# with. It only has to make sure that, when it finishes, apt genuinely offers
+# Zabbix packages - which is a stronger check than "the package installed".
+
+- name: Refuse to run without a release package URL
+  ansible.builtin.assert:
+    that:
+      - zbx_repo_deb_url | length > 0
+    fail_msg: >-
+      No zabbix-release package URL was supplied. This host's OS codename is
+      probably missing from the zabbix_versions table, or it has never been probed.
+    quiet: true
+
+- name: Look for Zabbix packages from the Ubuntu repository
+  ansible.builtin.shell:
+    cmd: "dpkg-query -W -f='${binary:Package}\\n' 'zabbix*' 2>/dev/null || true"
+  register: zbx_installed
+  changed_when: false
+  check_mode: false
+
+- name: Remove Zabbix packages that came from the Ubuntu repository
+  ansible.builtin.shell:
+    cmd: "apt-get -y purge 'zabbix*'"
+  become: true
+  when:
+    - zbx_remove_distro_packages | bool
+    - zbx_installed.stdout | trim | length > 0
+  changed_when: true
+
+- name: Install the zabbix-release package
+  ansible.builtin.apt:
+    deb: "{{ zbx_repo_deb_url }}"
+    state: present
+  become: true
+  register: zbx_release_pkg
+
+# --- apt update, with the known zabbix-tools trap handled ------------------
+
+- name: Update the apt cache
+  ansible.builtin.apt:
+    update_cache: true
+  become: true
+  register: zbx_apt_update
+  # A failure here is expected often enough to be worth handling rather than
+  # aborting on; ignore_errors keeps .failed readable for the next block.
+  ignore_errors: true
+
+- name: Deal with a broken zabbix-tools repository
+  when:
+    - zbx_fix_broken_tools_repo | bool
+    - zbx_apt_update.failed | default(false)
+    - not ansible_check_mode
+  block:
+    - name: Find the zabbix-tools repository definition
+      ansible.builtin.find:
+        paths: /etc/apt/sources.list.d
+        patterns: 'zabbix-tools.*'
+      register: zbx_tools_files
+      become: true
+
+    - name: Disable it
+      ansible.builtin.command:
+        cmd: "mv {{ item.path }} {{ item.path }}.zbxdeploy-disabled"
+      become: true
+      loop: "{{ zbx_tools_files.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      changed_when: true
+
+    - name: Say what was done and why
+      ansible.builtin.debug:
+        msg: >-
+          The zabbix-tools repository registered by zabbix-release was not usable on this
+          host and has been disabled. It only provides optional tooling; the Zabbix
+          packages themselves are unaffected.
+      when: zbx_tools_files.files | length > 0
+
+    - name: Update the apt cache again
+      ansible.builtin.apt:
+        update_cache: true
+      become: true
+      when: zbx_tools_files.files | length > 0
+
+# --- prove it works -------------------------------------------------------
+
+- name: Ask apt what it would install for the probe package
+  ansible.builtin.shell:
+    cmd: "apt-cache policy {{ zbx_probe_package }} 2>/dev/null | awk '/Candidate:/ {print $2}'"
+  register: zbx_candidate
+  changed_when: false
+  check_mode: false
+
+- name: Confirm the repository actually offers Zabbix packages
+  ansible.builtin.assert:
+    that:
+      - zbx_candidate.stdout | trim | length > 0
+      - zbx_candidate.stdout | trim != '(none)'
+    fail_msg: >-
+      The release package installed, but apt still offers no {{ zbx_probe_package }}.
+      Zabbix has in the past published a repository for a new Ubuntu release without
+      the packages behind it. Check {{ zbx_repo_deb_url }} and the matching entry in
+      zabbix_versions before going further.
+    success_msg: "apt offers {{ zbx_probe_package }} {{ zbx_candidate.stdout | trim }}."
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Report the repository state
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: Zabbix {{ zbx_version }} repository ready,
+      {{ zbx_probe_package }} candidate {{ zbx_candidate.stdout | trim | default('unknown') }}

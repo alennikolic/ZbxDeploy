@@ -7,6 +7,7 @@ use ZbxDeploy\Controller\CredentialController;
 use ZbxDeploy\Controller\DashboardController;
 use ZbxDeploy\Controller\HostController;
 use ZbxDeploy\Controller\JobController;
+use ZbxDeploy\Controller\RoleController;
 use ZbxDeploy\Core\Auth;
 use ZbxDeploy\Core\Config;
 use ZbxDeploy\Core\Router;
@@ -37,6 +38,11 @@ $router->get('/hosts/{id}', [HostController::class, 'show']);
 $router->post('/hosts/{id}/probe', [HostController::class, 'probe']);
 $router->post('/hosts/{id}/delete', [HostController::class, 'delete']);
 $router->post('/probe-all', [HostController::class, 'probe']);
+
+$router->get('/hosts/{id}/roles/new', [RoleController::class, 'newForm']);
+$router->post('/hosts/{id}/roles', [RoleController::class, 'store']);
+$router->post('/hosts/{id}/roles/{roleRowId}/delete', [RoleController::class, 'delete']);
+$router->post('/hosts/{id}/apply', [RoleController::class, 'apply']);
 
 $router->get('/credentials', [CredentialController::class, 'index']);
 $router->post('/credentials', [CredentialController::class, 'store']);

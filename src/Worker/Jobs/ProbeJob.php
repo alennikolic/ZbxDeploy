@@ -80,8 +80,7 @@ final class ProbeJob
     private function ingestFacts(int $jobId, array $hosts, string $factsDir): void
     {
         foreach ($hosts as $host) {
-            $safeName = preg_replace('/[^A-Za-z0-9_.\-]/', '_', (string) $host['hostname']);
-            $path = $factsDir . '/' . $safeName . '.json';
+            $path = $factsDir . '/' . AnsibleRunner::inventoryName((string) $host['hostname']) . '.json';
 
             if (!is_file($path)) {
                 Database::run(

@@ -57,24 +57,53 @@
     <div class="card">
         <div class="card-head">
             <h2>Roles</h2>
-            <span class="muted" style="font-size: 13px">Role assignment lands in the next step</span>
+            <a href="/hosts/{{ host.id }}/roles/new" class="btn btn-ghost btn-sm">Add role</a>
         </div>
+
         {% if roles is empty %}
-            <p class="muted">No roles assigned to this host yet.</p>
+            <p class="muted">No roles assigned yet. A role records what this host should run; applying is a separate step.</p>
         {% else %}
             <table>
-                <thead><tr><th>Role</th><th>Desired</th><th>Status</th><th>Applied</th></tr></thead>
+                <thead><tr><th>Role</th><th>Status</th><th>Last applied</th><th></th></tr></thead>
                 <tbody>
                 {% for role in roles %}
                     <tr>
-                        <td class="mono">{{ role.role }}</td>
-                        <td class="muted">{{ role.desired_state }}</td>
-                        <td><span class="badge badge-idle">{{ role.last_status }}</span></td>
+                        <td>
+                            {{ catalog[role.role].label|default(role.role) }}
+                            <div class="mono muted" style="font-size: 12px">{{ role.role }}</div>
+                        </td>
+                        <td>
+                            {% if role.last_status == 'applied' %}
+                                <span class="badge badge-ok">applied</span>
+                            {% elseif role.last_status == 'failed' %}
+                                <span class="badge badge-err">failed</span>
+                            {% else %}
+                                <span class="badge badge-warn">pending</span>
+                            {% endif %}
+                        </td>
                         <td class="muted">{{ role.applied_at|ago }}</td>
+                        <td style="text-align: right">
+                            <a class="btn btn-ghost btn-sm"
+                               href="/hosts/{{ host.id }}/roles/new?role={{ role.role|url_encode }}">Edit</a>
+                            <form method="post" action="/hosts/{{ host.id }}/roles/{{ role.id }}/delete" class="inline-form"
+                                  onsubmit="return confirm('Remove this role from the plan? Nothing is uninstalled on the server.')">
+                                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                                <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+                            </form>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+
+            <form method="post" action="/hosts/{{ host.id }}/apply" style="margin-top: 18px">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <label style="display: flex; align-items: center; gap: 8px; color: var(--text); margin-bottom: 12px">
+                    <input type="checkbox" name="check_mode" value="1" checked style="width: auto">
+                    <span>Dry run first (ansible --check: report what would change, change nothing)</span>
+                </label>
+                <button type="submit" class="btn">Apply roles</button>
+            </form>
         {% endif %}
     </div>
 

@@ -1,0 +1,10 @@
+---
+# Parameters arrive as a single dict so the apply playbook can pass whatever
+# the catalogue manifest produced, without the role and the manifest having to
+# agree on a long list of variable names.
+zbx_params: {}
+
+zbx_timezone: "{{ zbx_params.timezone | default('UTC') }}"
+zbx_manage_time_sync: "{{ zbx_params.manage_time_sync | default(true) | bool }}"
+zbx_ntp_servers: "{{ zbx_params.ntp_servers | default(['0.pool.ntp.org', '1.pool.ntp.org']) }}"
+zbx_min_free_mb: "{{ zbx_params.min_free_mb | default(5120) | int }}"

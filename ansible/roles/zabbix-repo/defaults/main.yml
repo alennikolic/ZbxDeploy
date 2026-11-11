@@ -1,0 +1,12 @@
+---
+zbx_params: {}
+
+# Injected by ZbxDeploy from the zabbix_versions table - never typed by hand.
+zbx_repo_deb_url: "{{ zbx_params.repo_deb_url | default('') }}"
+zbx_version: "{{ zbx_params.zabbix_version | default('') }}"
+
+zbx_remove_distro_packages: "{{ zbx_params.remove_distro_packages | default(false) | bool }}"
+zbx_fix_broken_tools_repo: "{{ zbx_params.fix_broken_tools_repo | default(true) | bool }}"
+
+# The package used to prove the repository actually works afterwards.
+zbx_probe_package: zabbix-agent2

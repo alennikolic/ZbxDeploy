@@ -12,9 +12,9 @@ It is deliberately opinionated. It is not a generic automation runner that
 happens to have a web UI; it knows what a Zabbix environment is made of, which
 means it can derive most parameters instead of asking you for them twice.
 
-> **Status: step 1 of the build.** What ships here is the foundation — container
-> stack, schema, authentication, job queue with live output, inventory, and the
-> probe job. Role deployment is the next step. See [Roadmap](#roadmap).
+> **Status: step 2 of the build.** The foundation is in place and the first two
+> roles work end to end: preflight and the Zabbix repository, with dry-run
+> support. The components themselves come next. See [Roadmap](#roadmap).
 
 ---
 
@@ -30,6 +30,13 @@ means it can derive most parameters instead of asking you for them twice.
   architecture, memory, free disk, timezone, clock sync, whether `sudo` works,
   whether Zabbix packages are already installed, and what the configured apt
   repositories would install. It changes nothing on the target.
+- **Role catalogue**: roles are declared by a manifest, and the parameter form
+  is built from it. Two roles ship today — `zabbix-preflight` (timezone, NTP,
+  capacity) and `zabbix-repo` (official repository, with the broken
+  `zabbix-tools` repository handled).
+- **Apply with a dry run**: the apply job maps straight onto
+  `ansible-playbook --check --diff`, so "show me what would change" is a
+  checkbox, not a second code path.
 - **Version matrix** as data: Zabbix release × Ubuntu release lives in a table,
   so supporting 7.4 or 8.0 later is a row and a template directory, not a code
   change.
@@ -71,8 +78,10 @@ overwritten and removed in a `finally` block when the job ends.
 ansible/
   ansible.cfg            SSH and execution settings for every job
   playbooks/probe.yml    the probe job
-  roles/                 Zabbix roles (next step)
+  playbooks/apply.yml    runs each host's assigned roles, in order
+  roles/                 the Ansible roles themselves
   templates/7.0/         versioned config templates
+catalog/                 role manifests - what the UI builds its forms from
 bin/
   worker.php             queue worker entry point
   genkey.php             generate APP_KEY
@@ -134,6 +143,13 @@ Open <http://localhost:8080> and sign in.
 3. **Probe** → watch the output stream in. You now know whether the host is
    reachable, whether `sudo` works, and whether its release is one you have a
    Zabbix repository for.
+4. **Add role** → `Preflight`, then `Zabbix repository`.
+5. **Apply roles** with the dry-run box ticked, read the diff, then apply for
+   real.
+
+Both roles need the target host to reach `repo.zabbix.com` and the Ubuntu
+mirrors itself — ZbxDeploy drives the installation over SSH, it does not proxy
+package downloads.
 
 Prepare each target host once:
 
@@ -151,6 +167,48 @@ If you prefer not to grant `NOPASSWD`, leave the sudo password field filled in
 when you create the credential instead.
 
 ---
+
+## The role catalogue
+
+A role is two things: an Ansible role under `ansible/roles/<id>/`, and a
+manifest under `catalog/<id>.php` that describes it to the UI.
+
+```php
+return [
+    'id'      => 'zabbix-agent2',
+    'label'   => 'Zabbix agent 2',
+    'summary' => 'Installs and configures the agent.',
+    'type'    => 'state',          // state = desired state, action = one-off
+    'risk'    => 'low',
+    'order'   => 60,               // deployment order across all roles
+    'requires_facts' => ['os_codename'],
+    'params'  => [
+        'server' => [
+            'type' => 'text', 'label' => 'Server or proxy address', 'required' => true,
+        ],
+    ],
+];
+```
+
+The form, validation, ordering and audit entries all follow from that. Nothing
+in PHP needs to know the role exists.
+
+Parameters reach the Ansible role as a single `zbx_params` dict, so the role's
+`defaults/main.yml` unpacks what it needs and provides fallbacks:
+
+```yaml
+zbx_params: {}
+zbx_server: "{{ zbx_params.server | default('127.0.0.1') }}"
+```
+
+Two rules worth keeping:
+
+- **Assigning a role records intent; applying changes the server.** Removing an
+  assignment never uninstalls anything.
+- **Version-specific values are injected, not typed.** `zabbix-repo` never asks
+  for a repository URL — the apply job resolves it from `zabbix_versions` using
+  the environment's Zabbix version and the host's own codename, and fails with a
+  clear message when there is no matching row.
 
 ## Adding a Zabbix or Ubuntu release
 
@@ -206,8 +264,8 @@ infrastructure, not as an internal website.
 | Step | Scope |
 |---|---|
 | 1 ✅ | Container stack, schema, auth, job queue with live log, inventory, probe |
-| 2 | Role catalogue and the first roles: `zabbix-repo`, `zabbix-preflight` (timezone + NTP), `zabbix-agent2` |
-| 3 | `zabbix-db`, `zabbix-server`, `zabbix-frontend`; dependency-ordered deployment plan with check mode |
+| 2 ✅ | Role catalogue, apply job with dry run, `zabbix-preflight` and `zabbix-repo` |
+| 3 | `zabbix-agent2`, then `zabbix-db`, `zabbix-server`, `zabbix-frontend`; environment-wide deployment plan |
 | 4 | `zabbix-proxy`, PSK key generation and distribution, Zabbix API registration of hosts and proxies |
 | 5 | Config ownership: every `.conf` rendered from the database, drift detection, edit-and-reapply |
 | 6 | Firewall rules derived from the topology, with a commit-confirmed rollback timer |

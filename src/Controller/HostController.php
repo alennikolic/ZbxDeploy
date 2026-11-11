@@ -100,9 +100,10 @@ final class HostController
         $facts = $host['facts'] !== null ? json_decode((string) $host['facts'], true) : null;
 
         View::send('hosts/show.twig', [
-            'host'  => $host,
-            'facts' => is_array($facts) ? $facts : [],
-            'roles' => Database::all('SELECT * FROM host_roles WHERE host_id = :id ORDER BY role', ['id' => $host['id']]),
+            'host'    => $host,
+            'facts'   => is_array($facts) ? $facts : [],
+            'catalog' => \ZbxDeploy\Core\Catalog::all(),
+            'roles'   => Database::all('SELECT * FROM host_roles WHERE host_id = :id ORDER BY role', ['id' => $host['id']]),
             'jobs'  => Database::all(
                 "SELECT * FROM jobs WHERE JSON_CONTAINS(params->'$.host_ids', :id, '$') ORDER BY id DESC LIMIT 10",
                 ['id' => (string) (int) $host['id']]

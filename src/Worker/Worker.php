@@ -7,6 +7,7 @@ namespace ZbxDeploy\Worker;
 use ZbxDeploy\Core\Config;
 use ZbxDeploy\Core\Database;
 use ZbxDeploy\Core\JobQueue;
+use ZbxDeploy\Worker\Jobs\ApplyJob;
 use ZbxDeploy\Worker\Jobs\ProbeJob;
 
 /**
@@ -21,6 +22,7 @@ final class Worker
     /** @var array<string, class-string> */
     private const HANDLERS = [
         'probe' => ProbeJob::class,
+        'apply' => ApplyJob::class,
     ];
 
     public function __construct()

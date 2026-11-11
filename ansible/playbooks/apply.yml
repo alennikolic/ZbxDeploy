@@ -1,0 +1,48 @@
+---
+# Apply the roles ZbxDeploy has assigned to each host.
+#
+# The worker passes zbxdeploy_host_roles: a dict keyed by inventory hostname,
+# each value an ordered list of {role, params}. Ordering is decided in PHP from
+# the catalogue, because that is where the dependency between components lives.
+
+- name: ZbxDeploy apply
+  hosts: targets
+  gather_facts: true
+  become: false
+  ignore_unreachable: true
+
+  vars:
+    zbxdeploy_results_dir: /data/results
+    zbxdeploy_host_roles: {}
+
+  tasks:
+    - name: Make sure this host has something to do
+      ansible.builtin.assert:
+        that:
+          - zbxdeploy_host_roles[inventory_hostname] | default([]) | length > 0
+        fail_msg: "No roles are assigned to {{ inventory_hostname }}."
+        quiet: true
+
+    - name: Apply assigned roles in order
+      ansible.builtin.include_role:
+        name: "{{ zbx_role_item.role }}"
+      vars:
+        zbx_params: "{{ zbx_role_item.params | default({}) }}"
+      loop: "{{ zbxdeploy_host_roles[inventory_hostname] }}"
+      loop_control:
+        loop_var: zbx_role_item
+        label: "{{ zbx_role_item.role }}"
+
+    - name: Hand the result back to ZbxDeploy
+      ansible.builtin.copy:
+        content: "{{ zbxdeploy_result | to_nice_json }}"
+        dest: "{{ zbxdeploy_results_dir }}/{{ inventory_hostname }}.json"
+        mode: '0600'
+      vars:
+        zbxdeploy_result:
+          hostname: "{{ inventory_hostname }}"
+          check_mode: "{{ ansible_check_mode }}"
+          applied: "{{ zbxdeploy_host_roles[inventory_hostname] | map(attribute='role') | list }}"
+      delegate_to: localhost
+      become: false
+      check_mode: false

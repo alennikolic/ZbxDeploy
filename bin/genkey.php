@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 /**
- * Prints a new APP_KEY. Run once when setting up, put the value in .env,
- * and keep a copy somewhere safe: without it, every stored credential is lost.
+ * Prints a ready-to-paste APP_KEY line for .env.
  *
  *   docker compose run --rm php php bin/genkey.php
+ *
+ * The value is single-quoted on purpose: Docker Compose treats $ as the start
+ * of a variable reference in .env, and only single quotes switch that off.
+ *
+ * Back the key up. Without it, every stored credential is unrecoverable.
  */
 
 if (!extension_loaded('sodium')) {
@@ -14,4 +18,15 @@ if (!extension_loaded('sodium')) {
     exit(1);
 }
 
-echo base64_encode(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES)), PHP_EOL;
+$key = base64_encode(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES));
+
+// The line itself goes to stdout so it can be piped or appended directly.
+echo "APP_KEY='", $key, "'", PHP_EOL;
+
+fwrite(STDERR, <<<TXT
+
+    Copy the line above into .env, replacing the existing APP_KEY.
+    Keep the single quotes. Store a copy somewhere safe - this key decrypts
+    every SSH key and password ZbxDeploy holds.
+
+    TXT);

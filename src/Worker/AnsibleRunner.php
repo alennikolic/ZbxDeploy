@@ -94,7 +94,7 @@ final class AnsibleRunner
 
         foreach ($hosts as $host) {
             $parts = [
-                $this->inventoryName((string) $host['hostname']),
+                self::inventoryName((string) $host['hostname']),
                 'ansible_host=' . $host['address'],
                 'ansible_port=' . (int) $host['ssh_port'],
             ];
@@ -135,9 +135,11 @@ final class AnsibleRunner
     }
 
     /**
-     * Ansible inventory names must not contain spaces or '='.
+     * Ansible inventory names must not contain spaces or '='. Job handlers use
+     * the same function so the names they put in extra vars and the names they
+     * look for in result files always line up with the inventory.
      */
-    private function inventoryName(string $hostname): string
+    public static function inventoryName(string $hostname): string
     {
         return preg_replace('/[^A-Za-z0-9_.\-]/', '_', $hostname) ?? 'host';
     }

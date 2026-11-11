@@ -1,0 +1,96 @@
+{% extends 'layout.twig' %}
+
+{% set active = 'hosts' %}
+{% block title %}Add role · {{ host.hostname }} · {{ app_name }}{% endblock %}
+
+{% block content %}
+    <h1>Add role to {{ host.hostname }}</h1>
+    <p class="subtitle">Assigning a role records intent. Nothing happens on the server until you apply.</p>
+
+    {% if manifest is null %}
+        <div class="card">
+            <h2>Pick a role</h2>
+            <table>
+                <thead><tr><th>Role</th><th>What it does</th><th>Risk</th><th></th></tr></thead>
+                <tbody>
+                {% for id, role in catalog %}
+                    <tr>
+                        <td>
+                            {{ role.label }}
+                            {% if id in assigned %}<span class="badge badge-idle" style="margin-left: 6px">assigned</span>{% endif %}
+                        </td>
+                        <td class="muted">{{ role.summary }}</td>
+                        <td>
+                            {% if role.risk == 'low' %}
+                                <span class="badge badge-ok">low</span>
+                            {% elseif role.risk == 'high' %}
+                                <span class="badge badge-err">high</span>
+                            {% else %}
+                                <span class="badge badge-warn">{{ role.risk }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right">
+                            <a class="btn btn-ghost btn-sm" href="/hosts/{{ host.id }}/roles/new?role={{ id|url_encode }}">
+                                {{ id in assigned ? 'Edit' : 'Choose' }}
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-head">
+                <h2>{{ manifest.label }}</h2>
+                <a href="/hosts/{{ host.id }}/roles/new" class="btn btn-ghost btn-sm">Change role</a>
+            </div>
+            <p class="muted" style="margin-top: 0">{{ manifest.summary }}</p>
+
+            <form method="post" action="/hosts/{{ host.id }}/roles">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <input type="hidden" name="role" value="{{ manifest.id }}">
+
+                {% for name, spec in manifest.params %}
+                    <div class="field">
+                        {% if spec.type == 'bool' %}
+                            <label style="display: flex; align-items: flex-start; gap: 9px; color: var(--text)">
+                                <input type="checkbox" name="params[{{ name }}]" value="1"
+                                       style="width: auto; margin-top: 3px"
+                                       {{ spec.default ? 'checked' : '' }}>
+                                <span>{{ spec.label }}</span>
+                            </label>
+                        {% elseif spec.type == 'list' %}
+                            <label for="p_{{ name }}">{{ spec.label }}</label>
+                            <textarea id="p_{{ name }}" name="params[{{ name }}]"
+                                      style="min-height: 90px">{{ spec.default|default([])|join("\n") }}</textarea>
+                        {% elseif spec.type == 'select' %}
+                            <label for="p_{{ name }}">{{ spec.label }}</label>
+                            <select id="p_{{ name }}" name="params[{{ name }}]">
+                                {% for value, text in spec.options %}
+                                    <option value="{{ value }}" {{ spec.default == value ? 'selected' : '' }}>{{ text }}</option>
+                                {% endfor %}
+                            </select>
+                        {% elseif spec.type == 'number' %}
+                            <label for="p_{{ name }}">{{ spec.label }}</label>
+                            <input type="number" id="p_{{ name }}" name="params[{{ name }}]"
+                                   value="{{ spec.default }}"
+                                   {% if spec.min is defined %}min="{{ spec.min }}"{% endif %}
+                                   {% if spec.max is defined %}max="{{ spec.max }}"{% endif %}>
+                        {% else %}
+                            <label for="p_{{ name }}">{{ spec.label }}</label>
+                            <input type="text" id="p_{{ name }}" name="params[{{ name }}]" value="{{ spec.default }}">
+                        {% endif %}
+
+                        {% if spec.help is defined %}<div class="hint">{{ spec.help }}</div>{% endif %}
+                    </div>
+                {% else %}
+                    <p class="muted">This role takes no parameters.</p>
+                {% endfor %}
+
+                <button type="submit" class="btn">Assign role</button>
+                <a href="/hosts/{{ host.id }}" class="btn btn-ghost">Cancel</a>
+            </form>
+        </div>
+    {% endif %}
+{% endblock %}

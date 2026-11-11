@@ -1,0 +1,103 @@
+---
+# Preflight: make the host a sane place to install a Zabbix component.
+#
+# Everything here is cheap, reversible and safe to run repeatedly. Nothing
+# Zabbix-specific is installed; this role only removes the reasons a later
+# deployment would misbehave.
+
+- name: Check how much space is free on /
+  ansible.builtin.set_fact:
+    zbx_root_free_mb: >-
+      {{ ((ansible_mounts | default([])
+           | selectattr('mount', 'equalto', '/')
+           | map(attribute='size_available')
+           | first | default(0)) / 1048576) | round | int }}
+
+- name: Fail early if the host is nearly full
+  ansible.builtin.assert:
+    that:
+      - zbx_root_free_mb | int >= zbx_min_free_mb | int
+    fail_msg: >-
+      Only {{ zbx_root_free_mb }} MB free on / but {{ zbx_min_free_mb }} MB required.
+      Free up space before deploying a Zabbix component to this host.
+    success_msg: "{{ zbx_root_free_mb }} MB free on / (minimum {{ zbx_min_free_mb }} MB)."
+    quiet: true
+
+- name: Read the current timezone
+  ansible.builtin.command:
+    cmd: timedatectl show --property=Timezone --value
+  register: zbx_current_tz
+  changed_when: false
+  check_mode: false
+
+- name: Set the timezone
+  ansible.builtin.command:
+    cmd: "timedatectl set-timezone {{ zbx_timezone }}"
+  become: true
+  when: zbx_current_tz.stdout | trim != zbx_timezone
+  changed_when: true
+
+# --- time synchronisation -------------------------------------------------
+
+- name: Manage time synchronisation
+  when: zbx_manage_time_sync | bool
+  block:
+    - name: Install systemd-timesyncd
+      ansible.builtin.apt:
+        name: systemd-timesyncd
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      become: true
+
+    - name: Make sure the timesyncd drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/timesyncd.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      become: true
+
+    - name: Write the ZbxDeploy NTP drop-in
+      ansible.builtin.copy:
+        dest: /etc/systemd/timesyncd.conf.d/zbxdeploy.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          # Managed by ZbxDeploy. Local edits will be overwritten.
+          [Time]
+          NTP={{ zbx_ntp_servers | join(' ') }}
+      become: true
+      register: zbx_timesync_conf
+
+    - name: Enable and start systemd-timesyncd
+      ansible.builtin.systemd_service:
+        name: systemd-timesyncd
+        enabled: true
+        state: "{{ 'restarted' if zbx_timesync_conf.changed else 'started' }}"
+      become: true
+
+    - name: Turn network time on
+      ansible.builtin.command:
+        cmd: timedatectl set-ntp true
+      become: true
+      changed_when: false
+
+# --- verification ---------------------------------------------------------
+
+- name: Read the resulting time status
+  ansible.builtin.command:
+    cmd: timedatectl show --property=Timezone --property=NTPSynchronized --value
+  register: zbx_final_tz
+  changed_when: false
+  check_mode: false
+
+- name: Report the time status
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: timezone {{ zbx_final_tz.stdout_lines[0] | default('?') }},
+      clock synchronised: {{ zbx_final_tz.stdout_lines[1] | default('unknown') }}
+      {{ '(it can take a minute or two after enabling NTP)'
+         if (zbx_final_tz.stdout_lines[1] | default('no')) != 'yes' else '' }}

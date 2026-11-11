@@ -3,28 +3,33 @@
 declare(strict_types=1);
 
 /**
- * Produces the ADMIN_PASSWORD_HASH value for .env.
+ * Prints a ready-to-paste ADMIN_PASSWORD_HASH line for .env.
  *
  *   docker compose run --rm php php bin/hash-password.php
  *
- * The password is read from stdin without echoing where possible, so it does
- * not end up in your shell history.
+ * The value is single-quoted on purpose: a bcrypt hash contains $ characters,
+ * which Docker Compose would otherwise read as variable references and replace
+ * with empty strings. Only single quotes switch that off.
+ *
+ * The password is read without echoing, so it stays out of your shell history.
  */
 
 function readSecret(string $prompt): string
 {
-    fwrite(STDOUT, $prompt);
+    fwrite(STDERR, $prompt);
 
-    if (stripos(PHP_OS_FAMILY, 'win') === false && is_readable('/dev/tty')) {
+    $hasTty = PHP_OS_FAMILY !== 'Windows' && stream_isatty(STDIN);
+
+    if ($hasTty) {
         shell_exec('stty -echo 2>/dev/null');
-        $value = trim((string) fgets(STDIN));
+        $value = (string) fgets(STDIN);
         shell_exec('stty echo 2>/dev/null');
-        fwrite(STDOUT, PHP_EOL);
-
-        return $value;
+        fwrite(STDERR, PHP_EOL);
+    } else {
+        $value = (string) fgets(STDIN);
     }
 
-    return trim((string) fgets(STDIN));
+    return trim($value);
 }
 
 $password = readSecret('New password: ');
@@ -45,4 +50,20 @@ if (strlen($password) < 12) {
     exit(1);
 }
 
-echo PHP_EOL, 'ADMIN_PASSWORD_HASH=', password_hash($password, PASSWORD_DEFAULT), PHP_EOL;
+$hash = password_hash($password, PASSWORD_DEFAULT);
+
+if (str_contains($hash, "'")) {
+    // Not possible with bcrypt, but a future algorithm change must not produce
+    // a line that silently breaks .env parsing.
+    fwrite(STDERR, "The generated hash contains a single quote; refusing to print an unsafe .env line.\n");
+    exit(1);
+}
+
+echo "ADMIN_PASSWORD_HASH='", $hash, "'", PHP_EOL;
+
+fwrite(STDERR, <<<TXT
+
+    Copy the line above into .env, replacing the existing ADMIN_PASSWORD_HASH.
+    Keep the single quotes, then run: docker compose up -d --force-recreate php worker
+
+    TXT);
