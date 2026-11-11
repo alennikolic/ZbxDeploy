@@ -51,6 +51,11 @@
         cache_valid_time: 3600
       become: true
 
+    # This one task runs even during a dry run. The copy below refuses to
+    # evaluate a file whose parent directory does not exist, so without it the
+    # first check-mode run of this role always fails on a host that has never
+    # had a timesyncd drop-in. Creating an empty, standard configuration
+    # directory is inert: it changes no behaviour on its own.
     - name: Make sure the timesyncd drop-in directory exists
       ansible.builtin.file:
         path: /etc/systemd/timesyncd.conf.d
@@ -59,6 +64,7 @@
         group: root
         mode: '0755'
       become: true
+      check_mode: false
 
     - name: Write the ZbxDeploy NTP drop-in
       ansible.builtin.copy:
