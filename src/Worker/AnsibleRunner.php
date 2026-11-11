@@ -128,6 +128,18 @@ final class AnsibleRunner
         $lines[] = '[targets:vars]';
         $lines[] = 'ansible_python_interpreter=/usr/bin/python3';
 
+        // Tasks that write results back run with delegate_to: localhost, which
+        // means the controller - this container, as www-data, whose home
+        // (/var/www) is not writable. Declaring localhost explicitly gives it a
+        // tmp directory we know exists, without forcing a shared remote_tmp on
+        // the target hosts (that one made root and the login user collide).
+        $lines[] = '';
+        $lines[] = '[local]';
+        $lines[] = sprintf(
+            'localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3 ansible_remote_tmp=%s/tmp/ansible-remote',
+            Config::dataDir()
+        );
+
         $path = $workDir . '/inventory.ini';
         file_put_contents($path, implode("\n", $lines) . "\n");
         chmod($path, 0600);
