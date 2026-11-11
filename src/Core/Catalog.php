@@ -25,6 +25,20 @@ final class Catalog
     /** @var array<string, array<string, mixed>>|null */
     private static ?array $roles = null;
 
+    /**
+     * Drop the cached manifests.
+     *
+     * The web tier gets a fresh PHP process per request, so it always sees new
+     * manifest files. The worker does not: it is a long-running process, and
+     * without this it would keep serving the catalogue as it stood when it
+     * started - a role added afterwards looks to it like a role that does not
+     * exist. The worker calls this before every job.
+     */
+    public static function reset(): void
+    {
+        self::$roles = null;
+    }
+
     /** @return array<string, array<string, mixed>> */
     public static function all(): array
     {

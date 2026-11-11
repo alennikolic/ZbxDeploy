@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace ZbxDeploy\Worker;
 
+use ZbxDeploy\Core\Catalog;
 use ZbxDeploy\Core\Config;
 use ZbxDeploy\Core\Database;
 use ZbxDeploy\Core\JobQueue;
@@ -72,6 +73,10 @@ final class Worker
     {
         $jobId = (int) $job['id'];
         $type = (string) $job['type'];
+
+        // Manifests are files on disk and may have appeared since this process
+        // started; re-read them rather than trusting a cache from an earlier job.
+        Catalog::reset();
 
         $this->out(sprintf('Job #%d (%s) started.', $jobId, $type));
         JobQueue::log($jobId, sprintf('Picked up by %s', $this->workerId), 'system');
