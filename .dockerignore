@@ -1,0 +1,9 @@
+.git
+.gitignore
+.env
+vendor
+data
+*.md
+!README.md
+.idea
+.vscode

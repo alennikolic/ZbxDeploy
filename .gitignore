@@ -1,0 +1,19 @@
+# Secrets and local state - never commit these
+.env
+*.pem
+*.key
+known_hosts
+
+# Dependencies
+/vendor/
+composer.lock
+
+# Runtime
+/data/
+*.log
+
+# Editors
+.idea/
+.vscode/
+*.swp
+.DS_Store
