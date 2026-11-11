@@ -1,0 +1,38 @@
+{# ansible/templates/7.0/zabbix_agent2_dropin.conf.j2 #}
+{{ '#' }} ===========================================================================
+{{ '#' }} MANAGED BY ZbxDeploy - Zabbix {{ zbx_version }}
+{{ '#' }}
+{{ '#' }} Hand edits are overwritten on the next apply.
+{{ '#' }}
+{{ '#' }} This file is read through the Include directive in
+{{ '#' }} {{ zbx_main_conf }}, which ZbxDeploy never modifies.
+{{ '#' }} Zabbix processes Include where it reads it, and the directive sits at
+{{ '#' }} the end of the main file, so values here override the stock ones.
+{{ '#' }}
+{{ '#' }} For settings ZbxDeploy does not manage, add your own file in this same
+{{ '#' }} directory under a different name. ZbxDeploy only ever writes this one.
+{{ '#' }} ===========================================================================
+
+{% if zbx_server | length > 0 %}
+{{ '#' }} Addresses allowed to query this agent (passive checks).
+Server={{ zbx_server }}
+{% endif %}
+{% if zbx_server_active | length > 0 %}
+{{ '#' }} Addresses this agent reports to for active checks.
+ServerActive={{ zbx_server_active }}
+{% endif %}
+
+{{ '#' }} Must match the host name configured in Zabbix exactly.
+Hostname={{ zbx_agent_hostname }}
+
+ListenPort={{ zbx_listen_port }}
+Timeout={{ zbx_timeout }}
+
+{% if zbx_allow_system_run %}
+{{ '#' }} Remote command execution is ENABLED on this host. Anyone able to reach
+{{ '#' }} this agent from an address in Server= can run arbitrary commands.
+AllowKey=system.run[*]
+{% else %}
+{{ '#' }} Remote command execution is disabled.
+DenyKey=system.run[*]
+{% endif %}

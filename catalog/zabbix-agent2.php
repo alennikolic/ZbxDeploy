@@ -6,16 +6,18 @@ declare(strict_types=1);
 /**
  * Zabbix agent 2.
  *
- * The first role that owns a configuration file. /etc/zabbix/zabbix_agent2.conf
- * is rendered from a template chosen by the environment's Zabbix version, which
- * means changing a setting later is the same operation as installing: edit the
- * parameters, apply again.
+ * ZbxDeploy writes exactly one drop-in file into the include directory the
+ * package provides, and never touches /etc/zabbix/zabbix_agent2.conf - that is
+ * a dpkg conffile, and overwriting it turns every package upgrade into a
+ * conflict. The drop-in is rendered from a template chosen by the
+ * environment's Zabbix version, so changing a setting later is the same
+ * operation as installing: edit the parameters, apply again.
  */
 
 return [
     'id'      => 'zabbix-agent2',
     'label'   => 'Zabbix agent 2',
-    'summary' => 'Installs zabbix-agent2 and renders its configuration from the template for this environment\'s Zabbix version. The agent is only installed and configured here - adding the host inside Zabbix itself is a separate step.',
+    'summary' => 'Installs zabbix-agent2 and writes its settings as a drop-in file, leaving the packaged configuration untouched. The agent is only installed and configured here - adding the host inside Zabbix itself is a separate step.',
     'type'    => 'state',
     'risk'    => 'low',
     'order'   => 60,

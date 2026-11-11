@@ -1,5 +1,19 @@
 # ansible/roles/zabbix-agent2/defaults/main.yml
 ---
+# ZbxDeploy writes exactly ONE drop-in file into the include directory the
+# package already provides, and never touches the main configuration file.
+#
+# Why a drop-in rather than the whole file:
+#   - /etc/zabbix/zabbix_agent2.conf is a dpkg conffile. Overwriting it turns
+#     every package upgrade into a conffile conflict, or silently keeps our
+#     version so new vendor options never reach the host.
+#   - Zabbix processes Include where it reads it, and the packages put that
+#     directive at the end of the file. A parameter in the drop-in therefore
+#     overrides the same parameter in the stock configuration.
+#
+# Exactly one file: Zabbix does not guarantee the order in which several
+# include files are read, so splitting parameters across them is unpredictable.
+
 zbx_params: {}
 
 # Injected by ZbxDeploy from the zabbix_versions table.
@@ -14,5 +28,16 @@ zbx_listen_port: "{{ zbx_params.listen_port | default(10050) | int }}"
 zbx_timeout: "{{ zbx_params.timeout | default(3) | int }}"
 zbx_allow_system_run: "{{ zbx_params.allow_system_run | default(false) | bool }}"
 
-zbx_config_path: /etc/zabbix/zabbix_agent2.conf
-zbx_include_dir: /etc/zabbix/zabbix_agent2.d
+zbx_main_conf: /etc/zabbix/zabbix_agent2.conf
+
+# Leave empty to discover the include directory from the installed
+# configuration. Set it explicitly only on a host that deviates.
+zbx_include_dir: ''
+zbx_include_dir_fallback: /etc/zabbix/zabbix_agent2.d
+
+# agent2 ships two active Include directives; plugins.d belongs to the plugin
+# packages and must never receive our drop-in.
+zbx_include_skip_names:
+  - plugins.d
+
+zbx_dropin_name: zbxdeploy.conf

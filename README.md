@@ -35,10 +35,13 @@ means it can derive most parameters instead of asking you for them twice.
   is built from it. Three roles ship today — `zabbix-preflight` (timezone, NTP,
   capacity), `zabbix-repo` (official repository, with the broken `zabbix-tools`
   repository handled) and `zabbix-agent2`.
-- **Configuration under the tool's control**: `zabbix_agent2.conf` is rendered
-  from a template chosen by the environment's Zabbix version, validated before
-  it is written, and re-rendered on every apply. Changing a setting later is
-  the same operation as installing.
+- **Configuration as a drop-in**: ZbxDeploy writes exactly one file into the
+  agent's include directory and never touches the packaged
+  `zabbix_agent2.conf`, which is a dpkg conffile. The include directory is
+  discovered by reading the installed configuration, the drop-in is rendered
+  from a template chosen by the environment's Zabbix version, and the merged
+  result is tested before the agent is restarted — a bad drop-in leaves the
+  running agent on its previous configuration.
 - **Apply with a dry run**: the apply job maps straight onto
   `ansible-playbook --check --diff`, so "show me what would change" is a
   checkbox, not a second code path.

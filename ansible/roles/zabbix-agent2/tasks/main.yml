@@ -1,27 +1,111 @@
 # ansible/roles/zabbix-agent2/tasks/main.yml
 ---
-# Install and configure Zabbix agent 2.
-#
-# This role owns /etc/zabbix/zabbix_agent2.conf: the file is rendered from the
-# template for this environment's Zabbix version, so changing a setting later
-# is the same operation as installing it the first time. Local additions belong
-# in the include directory, which the template preserves.
+# Install Zabbix agent 2 and write ZbxDeploy's settings as a single drop-in
+# file. The packaged configuration file is read, never modified.
 
 - name: Refuse to run without a server address
   ansible.builtin.assert:
     that:
-      - zbx_server | length > 0
+      - (zbx_server | length > 0) or (zbx_server_active | length > 0)
     fail_msg: >-
-      No server address was given for the agent. Set "Server or proxy address"
-      on the role before applying.
+      Neither a passive server address nor an active-checks address was given.
+      Without one of them the agent has nobody to talk to.
     quiet: true
+
+# Zabbix accepts only a comma as separator in Server; a semicolon would be
+# read as part of a single address and every connection would be refused.
+- name: Refuse a semicolon-separated server list
+  ansible.builtin.assert:
+    that:
+      - "';' not in zbx_server"
+      - "';' not in zbx_server_active"
+    fail_msg: >-
+      Server addresses must be separated by commas, not semicolons.
+    quiet: true
+
+- name: Refuse an empty entry in a server list
+  ansible.builtin.assert:
+    that:
+      - not (zbx_server is search('(^,)|(,,)|(,$)'))
+      - not (zbx_server_active is search('(^,)|(,,)|(,$)'))
+    fail_msg: >-
+      A server list has an empty entry (a leading, trailing or doubled comma).
+    quiet: true
+
+- name: Refuse an empty agent hostname
+  ansible.builtin.assert:
+    that:
+      - zbx_agent_hostname | length > 0
+    fail_msg: >-
+      The agent hostname is empty, so the agent would keep the stock value
+      "Zabbix server" and never match a host in Zabbix.
+    quiet: true
+
+# --- installation ---------------------------------------------------------
 
 - name: Install zabbix-agent2
   ansible.builtin.apt:
     name: zabbix-agent2
     state: present
+    update_cache: true
+    cache_valid_time: 3600
   become: true
-  register: zbx_agent_pkg
+
+# --- find the include directory -------------------------------------------
+#
+# Read from the installed configuration rather than assumed, so a packaging
+# change does not silently put our drop-in somewhere the agent never reads.
+# slurp only reads; the file stays untouched.
+
+- name: Read the installed agent configuration
+  ansible.builtin.slurp:
+    src: "{{ zbx_main_conf }}"
+  become: true
+  register: zbx_main_conf_raw
+  when: zbx_include_dir | length == 0
+  check_mode: false
+
+- name: Collect the active Include directives
+  ansible.builtin.set_fact:
+    # Zabbix honours a comment only at the start of a line, so keeping the
+    # lines that begin with Include is enough.
+    zbx_include_values: >-
+      {{ (zbx_main_conf_raw.content | b64decode).splitlines()
+         | map('trim')
+         | select('match', '^Include\s*=')
+         | map('regex_replace', '^Include\s*=\s*', '')
+         | map('trim')
+         | reject('equalto', '')
+         | list }}
+  when: zbx_include_dir | length == 0
+
+- name: Reduce them to directories
+  ansible.builtin.set_fact:
+    # A value with a glob (.../*.conf) yields its parent directory; a value
+    # ending in a slash is a directory already. A value naming a single file
+    # is skipped - a drop-in cannot be written into it.
+    zbx_glob_dirs: >-
+      {{ zbx_include_values | select('search', '\*') | map('dirname') | unique | list }}
+    zbx_plain_dirs: >-
+      {{ zbx_include_values | reject('search', '\*') | select('search', '/$')
+         | map('regex_replace', '/+$', '') | unique | list }}
+  when: zbx_include_dir | length == 0
+
+- name: Choose the include directory
+  ansible.builtin.set_fact:
+    # A glob directory wins: with a *.conf mask, stray files without the
+    # extension are not read, which makes the result more predictable.
+    zbx_include_dir: >-
+      {{ ((zbx_glob_dirs + zbx_plain_dirs)
+          | reject('search', zbx_include_skip_names | map('regex_escape') | join('|'))
+          | list | first) | default(zbx_include_dir_fallback, true) }}
+  when: zbx_include_dir | length == 0
+
+- name: Report where the drop-in will go
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}: writing {{ zbx_include_dir }}/{{ zbx_dropin_name }}
+      ({{ zbx_main_conf }} is left untouched)
 
 - name: Make sure the include directory exists
   ansible.builtin.file:
@@ -33,15 +117,13 @@
   become: true
   check_mode: false
 
-- name: Render the agent configuration
+- name: Write the ZbxDeploy drop-in
   ansible.builtin.template:
-    src: "{{ playbook_dir }}/../templates/{{ zbx_template_dir }}/zabbix_agent2.conf.j2"
-    dest: "{{ zbx_config_path }}"
+    src: "{{ playbook_dir }}/../templates/{{ zbx_template_dir }}/zabbix_agent2_dropin.conf.j2"
+    dest: "{{ zbx_include_dir }}/{{ zbx_dropin_name }}"
     owner: root
     group: zabbix
     mode: '0640'
-    backup: true
-    validate: "zabbix_agent2 -c %s -t agent.ping"
   become: true
   notify: Restart zabbix-agent2
 
@@ -52,19 +134,37 @@
     state: started
   become: true
 
-# Handlers normally run at the end of the play; flush them here so the checks
-# below look at the agent as configured, not as it was before.
-- name: Apply any pending restart before verifying
-  ansible.builtin.meta: flush_handlers
+# --- verify before restarting ---------------------------------------------
+#
+# The test reads the main configuration, which pulls in the drop-in we just
+# wrote, so it exercises the merged result without the agent having restarted
+# yet. If it fails the play stops here and the handler never runs, which
+# leaves the agent alive on its previous configuration.
 
-- name: Ask the agent to answer a trivial item
+- name: Check that the merged configuration parses and the agent answers
   ansible.builtin.command:
-    cmd: "zabbix_agent2 -c {{ zbx_config_path }} -t agent.ping"
+    cmd: "zabbix_agent2 -c {{ zbx_main_conf }} -t agent.ping"
   become: true
   register: zbx_agent_ping
   changed_when: false
   failed_when: false
   check_mode: false
+  when: not ansible_check_mode
+
+- name: Confirm the result
+  ansible.builtin.assert:
+    that:
+      - zbx_agent_ping.rc | default(1) == 0
+    fail_msg: >-
+      The agent could not evaluate agent.ping with the new drop-in, so the
+      running agent was left on its previous configuration.
+      Inspect {{ zbx_include_dir }}/{{ zbx_dropin_name }} and:
+      journalctl -u zabbix-agent2 -n 50
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Apply the pending restart now that the configuration is known good
+  ansible.builtin.meta: flush_handlers
 
 - name: Read the installed agent version
   ansible.builtin.command:
@@ -74,25 +174,15 @@
   failed_when: false
   check_mode: false
 
-- name: Confirm the agent answers
-  ansible.builtin.assert:
-    that:
-      - zbx_agent_ping.rc | default(1) == 0
-    fail_msg: >-
-      zabbix-agent2 is installed but does not answer agent.ping locally.
-      Check {{ zbx_config_path }} and: journalctl -u zabbix-agent2 -n 50
-    quiet: true
-  when: not ansible_check_mode
-
 - name: Report the agent state
   ansible.builtin.debug:
     msg: >-
       {{ inventory_hostname }}:
       {% if ansible_check_mode %}
-      check mode - zabbix-agent2 was not actually installed or reconfigured.
+      check mode - zabbix-agent2 was not installed or reconfigured.
       {% else %}
       {{ zbx_agent_version.stdout_lines[0] | default('zabbix-agent2') }},
       hostname {{ zbx_agent_hostname }}, listening on {{ zbx_listen_port }},
-      allowed from {{ zbx_server }},
+      passive from {{ zbx_server | default('nobody', true) }},
       active checks {{ 'to ' ~ zbx_server_active if zbx_server_active | length > 0 else 'disabled' }}.
       {% endif %}
