@@ -1,0 +1,11 @@
+{% extends 'layout.twig' %}
+
+{% block title %}{{ title }} · {{ app_name }}{% endblock %}
+
+{% block content %}
+    <h1>{{ title }}</h1>
+    <div class="card">
+        <pre class="mono" style="margin: 0; white-space: pre-wrap">{{ message }}</pre>
+    </div>
+    <a href="/" class="btn btn-ghost">Back to dashboard</a>
+{% endblock %}

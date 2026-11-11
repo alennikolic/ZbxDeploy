@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<header class="topbar">
+    <a class="brand" href="/">Zbx<span>Deploy</span></a>
+    <nav class="nav">
+        <a href="/" class="{{ active == 'dashboard' ? 'active' }}">Dashboard</a>
+        <a href="/hosts" class="{{ active == 'hosts' ? 'active' }}">Hosts</a>
+        <a href="/credentials" class="{{ active == 'credentials' ? 'active' }}">Credentials</a>
+        <a href="/jobs" class="{{ active == 'jobs' ? 'active' }}">Jobs</a>
+    </nav>
+    <div class="topbar-user">
+        <span>{{ current_user }}</span>
+        <form method="post" action="/logout" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn-ghost btn-sm">Sign out</button>
+        </form>
+    </div>
+</header>
+
+<main class="wrap">
+    {% for message in flash %}
+        <div class="flash flash-{{ message.type }}">{{ message.message }}</div>
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+</main>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

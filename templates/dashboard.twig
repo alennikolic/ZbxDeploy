@@ -1,0 +1,87 @@
+{% extends 'layout.twig' %}
+
+{% set active = 'dashboard' %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+
+{% block content %}
+    <h1>Dashboard</h1>
+    <p class="subtitle">Inventory, version matrix and recent activity.</p>
+
+    <div class="grid grid-4" style="margin-bottom: 24px">
+        <div class="stat">
+            <div class="value">{{ stats.hosts }}</div>
+            <div class="label">Hosts in inventory</div>
+        </div>
+        <div class="stat">
+            <div class="value">{{ stats.unprobed }}</div>
+            <div class="label">Never probed</div>
+        </div>
+        <div class="stat">
+            <div class="value">{{ stats.unreachable }}</div>
+            <div class="label">Unreachable</div>
+        </div>
+        <div class="stat">
+            <div class="value">{{ stats.running }}</div>
+            <div class="label">Jobs queued or running</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Environments</h2>
+        </div>
+        <table>
+            <thead>
+            <tr><th>Name</th><th>Zabbix</th><th>Database</th><th>Hosts</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+            {% for environment in environments %}
+                <tr>
+                    <td>{{ environment.name }}<div class="muted" style="font-size: 12px">{{ environment.description }}</div></td>
+                    <td class="mono">{{ environment.zabbix_version }}</td>
+                    <td class="mono">{{ environment.db_engine }}</td>
+                    <td>{{ environment.host_count }}</td>
+                    <td><span class="badge badge-idle">{{ environment.status }}</span></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5" class="muted">No environments yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Supported targets</h2>
+            <span class="muted" style="font-size: 13px">Edit the zabbix_versions table to add a release</span>
+        </div>
+        <table>
+            <thead>
+            <tr><th>Zabbix</th><th>OS</th><th>Codename</th><th>Full support ends</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+            {% for version in versions %}
+                <tr>
+                    <td class="mono">
+                        {{ version.zabbix_version }}
+                        {% if version.is_lts %}<span class="badge badge-ok" style="margin-left: 6px">LTS</span>{% endif %}
+                        {% if version.is_default %}<span class="badge badge-run" style="margin-left: 4px">default</span>{% endif %}
+                    </td>
+                    <td class="mono">{{ version.os_family }} {{ version.os_version }}</td>
+                    <td class="mono">{{ version.os_codename }}</td>
+                    <td class="mono">{{ version.eol_full_support ?: '—' }}</td>
+                    <td class="muted">{{ version.notes }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Recent jobs</h2>
+            <a href="/jobs" class="btn btn-ghost btn-sm">All jobs</a>
+        </div>
+        {% include 'jobs/_table.twig' with {jobs: jobs} %}
+    </div>
+{% endblock %}

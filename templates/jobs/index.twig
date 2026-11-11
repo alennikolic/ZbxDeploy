@@ -1,0 +1,13 @@
+{% extends 'layout.twig' %}
+
+{% set active = 'jobs' %}
+{% block title %}Jobs · {{ app_name }}{% endblock %}
+
+{% block content %}
+    <h1>Jobs</h1>
+    <p class="subtitle">Everything ZbxDeploy has run, is running, or is waiting to run.</p>
+
+    <div class="card">
+        {% include 'jobs/_table.twig' with {jobs: jobs} %}
+    </div>
+{% endblock %}

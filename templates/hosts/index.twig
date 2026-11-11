@@ -1,0 +1,105 @@
+{% extends 'layout.twig' %}
+
+{% set active = 'hosts' %}
+{% block title %}Hosts · {{ app_name }}{% endblock %}
+
+{% block content %}
+    <h1>Hosts</h1>
+    <p class="subtitle">The inventory. Probe a host before assigning any Zabbix role to it.</p>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Inventory</h2>
+            <form method="post" action="/probe-all" class="inline-form">
+                <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-ghost btn-sm">Probe all</button>
+            </form>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>Hostname</th><th>Address</th><th>Environment</th><th>OS</th>
+                <th>Credential</th><th>Last probe</th><th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for host in hosts %}
+                <tr>
+                    <td>
+                        <a href="/hosts/{{ host.id }}">{{ host.hostname }}</a>
+                        {% if host.reachable is null %}
+                            <span class="badge badge-idle" style="margin-left: 6px">unprobed</span>
+                        {% elseif host.reachable %}
+                            <span class="badge badge-ok" style="margin-left: 6px">reachable</span>
+                        {% else %}
+                            <span class="badge badge-err" style="margin-left: 6px">unreachable</span>
+                        {% endif %}
+                    </td>
+                    <td class="mono">{{ host.address }}{% if host.ssh_port != 22 %}:{{ host.ssh_port }}{% endif %}</td>
+                    <td class="muted">{{ host.environment_name }}</td>
+                    <td class="mono muted">
+                        {{ host.os_family ? host.os_family ~ ' ' ~ host.os_version : '—' }}
+                        {% if host.os_codename %}<span class="muted">({{ host.os_codename }})</span>{% endif %}
+                    </td>
+                    <td class="muted">{{ host.credential_name ?: 'none' }}</td>
+                    <td class="muted">{{ host.last_probe_at|ago }}</td>
+                    <td style="text-align: right">
+                        <form method="post" action="/hosts/{{ host.id }}/probe" class="inline-form">
+                            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-ghost btn-sm"
+                                    {% if not host.credential_name %}disabled title="Attach a credential first"{% endif %}>Probe</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7" class="muted">No hosts yet. Add one below.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Add host</h2>
+        <form method="post" action="/hosts">
+            <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <div class="grid grid-2">
+                <div class="field">
+                    <label for="hostname">Hostname</label>
+                    <input type="text" id="hostname" name="hostname" placeholder="zbx-proxy-01" required>
+                    <div class="hint">The name this host will carry in Zabbix.</div>
+                </div>
+                <div class="field">
+                    <label for="address">Address</label>
+                    <input type="text" id="address" name="address" placeholder="10.0.10.21 or host.example.com" required>
+                    <div class="hint">What ZbxDeploy connects to over SSH.</div>
+                </div>
+                <div class="field">
+                    <label for="environment_id">Environment</label>
+                    <select id="environment_id" name="environment_id" required>
+                        {% for environment in environments %}
+                            <option value="{{ environment.id }}">{{ environment.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="credential_id">SSH credential</label>
+                    <select id="credential_id" name="credential_id">
+                        <option value="">— none yet —</option>
+                        {% for credential in credentials %}
+                            <option value="{{ credential.id }}">{{ credential.name }} ({{ credential.ssh_user }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="ssh_port">SSH port</label>
+                    <input type="number" id="ssh_port" name="ssh_port" value="22" min="1" max="65535">
+                </div>
+                <div class="field">
+                    <label for="notes">Notes</label>
+                    <input type="text" id="notes" name="notes" placeholder="optional">
+                </div>
+            </div>
+            <button type="submit" class="btn">Add host</button>
+        </form>
+    </div>
+{% endblock %}

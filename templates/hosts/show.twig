@@ -1,0 +1,92 @@
+{% extends 'layout.twig' %}
+
+{% set active = 'hosts' %}
+{% block title %}{{ host.hostname }} · {{ app_name }}{% endblock %}
+
+{% block content %}
+    <h1>{{ host.hostname }}</h1>
+    <p class="subtitle">{{ host.address }}:{{ host.ssh_port }} · environment {{ host.environment_name }}</p>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Facts</h2>
+            <div>
+                <form method="post" action="/hosts/{{ host.id }}/probe" class="inline-form">
+                    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-ghost btn-sm">Probe now</button>
+                </form>
+            </div>
+        </div>
+
+        {% if facts is empty %}
+            <p class="muted">This host has never been probed. Attach a credential and run a probe to collect its facts.</p>
+        {% else %}
+            <dl class="facts">
+                <dt>Operating system</dt>
+                <dd class="mono">{{ facts.os_family }} {{ facts.os_version }} ({{ facts.os_codename }})</dd>
+                <dt>Kernel</dt>
+                <dd class="mono">{{ facts.kernel ?: '—' }}</dd>
+                <dt>Architecture</dt>
+                <dd class="mono">{{ facts.architecture ?: '—' }}</dd>
+                <dt>Timezone</dt>
+                <dd class="mono">{{ facts.timezone ?: '—' }}</dd>
+                <dt>Clock synchronised</dt>
+                <dd>
+                    {% if facts.ntp_synchronized %}
+                        <span class="badge badge-ok">yes</span>
+                    {% else %}
+                        <span class="badge badge-warn">no — fix before deploying</span>
+                    {% endif %}
+                </dd>
+                <dt>Memory</dt>
+                <dd class="mono">{{ facts.memory_mb ? facts.memory_mb ~ ' MB' : '—' }}</dd>
+                <dt>CPU cores</dt>
+                <dd class="mono">{{ facts.cpu_cores ?: '—' }}</dd>
+                <dt>Free space on /</dt>
+                <dd class="mono">{{ facts.root_free_mb ? facts.root_free_mb ~ ' MB' : '—' }}</dd>
+                <dt>Zabbix packages present</dt>
+                <dd class="mono">{{ facts.zabbix_packages_installed ? 'yes — check for conflicts' : 'no' }}</dd>
+                <dt>Zabbix repo candidate</dt>
+                <dd class="mono">{{ facts.zabbix_agent2_candidate ?: 'none' }}</dd>
+                <dt>Last probed</dt>
+                <dd class="muted">{{ host.last_probe_at|ago }}</dd>
+            </dl>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Roles</h2>
+            <span class="muted" style="font-size: 13px">Role assignment lands in the next step</span>
+        </div>
+        {% if roles is empty %}
+            <p class="muted">No roles assigned to this host yet.</p>
+        {% else %}
+            <table>
+                <thead><tr><th>Role</th><th>Desired</th><th>Status</th><th>Applied</th></tr></thead>
+                <tbody>
+                {% for role in roles %}
+                    <tr>
+                        <td class="mono">{{ role.role }}</td>
+                        <td class="muted">{{ role.desired_state }}</td>
+                        <td><span class="badge badge-idle">{{ role.last_status }}</span></td>
+                        <td class="muted">{{ role.applied_at|ago }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Recent jobs for this host</h2>
+        {% include 'jobs/_table.twig' with {jobs: jobs} %}
+    </div>
+
+    <form method="post" action="/hosts/{{ host.id }}/delete" class="inline-form"
+          onsubmit="return confirm('Remove {{ host.hostname }} from the inventory? Nothing is changed on the server itself.')">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-danger btn-sm">Remove from inventory</button>
+    </form>
+    <a href="/hosts" class="btn btn-ghost btn-sm">Back to hosts</a>
+{% endblock %}

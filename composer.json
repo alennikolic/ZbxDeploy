@@ -1,0 +1,22 @@
+{
+    "name": "mds/zbxdeploy",
+    "description": "Deploy, configure and maintain Zabbix environments from one place",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.3",
+        "ext-json": "*",
+        "ext-pdo": "*",
+        "ext-sodium": "*",
+        "twig/twig": "^3.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "ZbxDeploy\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

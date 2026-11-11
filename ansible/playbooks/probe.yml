@@ -1,0 +1,89 @@
+---
+# Probe: look, do not touch.
+#
+# Collects everything ZbxDeploy needs to decide whether a host can take a
+# Zabbix role, and writes it as JSON on the controller for the worker to read.
+# Nothing is installed or modified on the target.
+
+- name: ZbxDeploy host probe
+  hosts: targets
+  gather_facts: true
+  become: false
+  ignore_unreachable: true
+
+  vars:
+    zbxdeploy_facts_dir: /data/facts
+
+  tasks:
+    - name: Read timezone and clock synchronisation status
+      ansible.builtin.command:
+        cmd: timedatectl show --property=Timezone --property=NTPSynchronized --value
+      register: zbx_timedatectl
+      changed_when: false
+      failed_when: false
+
+    - name: Verify privilege escalation works
+      ansible.builtin.command:
+        cmd: id -u
+      become: true
+      register: zbx_sudo
+      changed_when: false
+      failed_when: false
+
+    - name: List Zabbix packages already installed
+      ansible.builtin.shell:
+        cmd: "dpkg-query -W -f='${binary:Package}\\n' 'zabbix*' 2>/dev/null | head -n 20"
+      register: zbx_existing
+      changed_when: false
+      failed_when: false
+
+    - name: Ask apt what it would install for zabbix-agent2
+      ansible.builtin.shell:
+        cmd: "apt-cache policy zabbix-agent2 2>/dev/null | awk '/Candidate:/ {print $2}'"
+      register: zbx_candidate
+      changed_when: false
+      failed_when: false
+
+    - name: Assemble the probe document
+      ansible.builtin.set_fact:
+        zbxdeploy_probe:
+          hostname: "{{ inventory_hostname }}"
+          probed_at: "{{ ansible_date_time.iso8601 | default('') }}"
+          os_family: "{{ ansible_distribution | default('unknown') }}"
+          os_version: "{{ ansible_distribution_version | default('') }}"
+          os_codename: "{{ ansible_distribution_release | default('') }}"
+          architecture: "{{ ansible_architecture | default('') }}"
+          kernel: "{{ ansible_kernel | default('') }}"
+          cpu_cores: "{{ ansible_processor_vcpus | default(0) | int }}"
+          memory_mb: "{{ ansible_memtotal_mb | default(0) | int }}"
+          root_free_mb: >-
+            {{ ((ansible_mounts | default([])
+                 | selectattr('mount', 'equalto', '/')
+                 | map(attribute='size_available')
+                 | first | default(0)) / 1048576) | round | int }}
+          fqdn: "{{ ansible_fqdn | default('') }}"
+          default_ipv4: "{{ ansible_default_ipv4.address | default('') }}"
+          timezone: "{{ zbx_timedatectl.stdout_lines[0] | default('') }}"
+          ntp_synchronized: "{{ (zbx_timedatectl.stdout_lines[1] | default('no')) == 'yes' }}"
+          sudo_ok: "{{ (zbx_sudo.rc | default(1)) == 0 and (zbx_sudo.stdout | default('')) == '0' }}"
+          zabbix_packages_installed: "{{ (zbx_existing.stdout | default('') | trim) != '' }}"
+          zabbix_packages: "{{ zbx_existing.stdout_lines | default([]) }}"
+          zabbix_agent2_candidate: "{{ zbx_candidate.stdout | default('') | trim }}"
+
+    - name: Report the essentials in the job log
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}:
+          {{ zbxdeploy_probe.os_family }} {{ zbxdeploy_probe.os_version }}
+          ({{ zbxdeploy_probe.os_codename }}),
+          sudo={{ zbxdeploy_probe.sudo_ok }},
+          ntp={{ zbxdeploy_probe.ntp_synchronized }},
+          zabbix_present={{ zbxdeploy_probe.zabbix_packages_installed }}
+
+    - name: Hand the probe document back to ZbxDeploy
+      ansible.builtin.copy:
+        content: "{{ zbxdeploy_probe | to_nice_json }}"
+        dest: "{{ zbxdeploy_facts_dir }}/{{ inventory_hostname }}.json"
+        mode: '0600'
+      delegate_to: localhost
+      become: false

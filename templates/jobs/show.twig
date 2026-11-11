@@ -1,0 +1,82 @@
+{% extends 'layout.twig' %}
+
+{% set active = 'jobs' %}
+{% block title %}Job #{{ job.id }} · {{ app_name }}{% endblock %}
+
+{% block content %}
+    <h1>{{ job.title }}</h1>
+    <p class="subtitle">
+        Job #{{ job.id }} · type <span class="mono">{{ job.type }}</span> · queued by {{ job.created_by }}
+        {% if job.check_mode %} · <span class="badge badge-warn">check mode</span>{% endif %}
+    </p>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>Output</h2>
+            <span id="job-status" class="badge badge-idle">{{ job.status }}</span>
+        </div>
+        <div class="console" id="console"></div>
+        <p class="hint" id="job-footer"></p>
+    </div>
+
+    <a href="/jobs" class="btn btn-ghost btn-sm">Back to jobs</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const jobId = {{ job.id }};
+    const box = document.getElementById('console');
+    const statusEl = document.getElementById('job-status');
+    const footer = document.getElementById('job-footer');
+    let lastId = 0;
+    let delay = 1000;
+
+    const badgeClass = {
+        success: 'badge badge-ok',
+        failed: 'badge badge-err',
+        running: 'badge badge-run',
+        queued: 'badge badge-idle',
+        canceled: 'badge badge-idle'
+    };
+
+    function append(lines) {
+        if (!lines.length) return;
+        const atBottom = box.scrollHeight - box.clientHeight - box.scrollTop < 40;
+        for (const line of lines) {
+            const el = document.createElement('div');
+            el.className = 'l-' + line.stream;
+            el.textContent = line.line;
+            box.appendChild(el);
+        }
+        if (atBottom) box.scrollTop = box.scrollHeight;
+    }
+
+    async function poll() {
+        try {
+            const res = await fetch('/jobs/' + jobId + '/logs?after=' + lastId, {headers: {'Accept': 'application/json'}});
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+
+            append(data.lines);
+            lastId = data.lastId || lastId;
+
+            statusEl.textContent = data.status;
+            statusEl.className = badgeClass[data.status] || 'badge badge-idle';
+
+            if (data.finished) {
+                footer.textContent = 'Finished with exit code ' + (data.exitCode === null ? 'n/a' : data.exitCode) + '.';
+                return;
+            }
+            delay = data.lines.length ? 700 : Math.min(delay + 300, 3000);
+        } catch (e) {
+            footer.textContent = 'Lost contact with the server, retrying…';
+            delay = 3000;
+        }
+        setTimeout(poll, delay);
+    }
+
+    poll();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,29 @@
+<table>
+    <thead>
+    <tr><th>#</th><th>Job</th><th>Type</th><th>Status</th><th>Started</th><th>By</th></tr>
+    </thead>
+    <tbody>
+    {% for job in jobs %}
+        <tr>
+            <td class="mono"><a href="/jobs/{{ job.id }}">{{ job.id }}</a></td>
+            <td><a href="/jobs/{{ job.id }}">{{ job.title }}</a></td>
+            <td class="mono muted">{{ job.type }}</td>
+            <td>
+                {% if job.status == 'success' %}
+                    <span class="badge badge-ok">success</span>
+                {% elseif job.status == 'failed' %}
+                    <span class="badge badge-err">failed</span>
+                {% elseif job.status == 'running' %}
+                    <span class="badge badge-run">running</span>
+                {% else %}
+                    <span class="badge badge-idle">{{ job.status }}</span>
+                {% endif %}
+            </td>
+            <td class="muted">{{ job.started_at ? job.started_at|ago : 'not yet' }}</td>
+            <td class="muted">{{ job.created_by }}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="6" class="muted">No jobs yet.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
