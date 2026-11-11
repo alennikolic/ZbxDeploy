@@ -46,3 +46,7 @@
       delegate_to: localhost
       become: false
       check_mode: false
+      # Bookkeeping on the controller, not a change to the host. Counting it
+      # would make changed=0 - the signal that a host already matches its
+      # desired state - impossible to reach.
+      changed_when: false
