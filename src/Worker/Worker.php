@@ -1,4 +1,5 @@
 <?php
+// src/Worker/Worker.php
 
 declare(strict_types=1);
 

@@ -1,4 +1,5 @@
 <?php
+// src/Core/Catalog.php
 
 declare(strict_types=1);
 

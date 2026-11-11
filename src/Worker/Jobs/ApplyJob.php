@@ -1,4 +1,5 @@
 <?php
+// src/Worker/Jobs/ApplyJob.php
 
 declare(strict_types=1);
 

@@ -1,4 +1,5 @@
 <?php
+// src/Controller/HostController.php
 
 declare(strict_types=1);
 

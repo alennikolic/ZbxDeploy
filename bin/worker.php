@@ -1,4 +1,5 @@
 <?php
+// bin/worker.php
 
 declare(strict_types=1);
 

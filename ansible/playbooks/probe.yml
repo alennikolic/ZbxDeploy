@@ -1,3 +1,4 @@
+# ansible/playbooks/probe.yml
 ---
 # Probe: look, do not touch.
 #
@@ -9,7 +10,6 @@
   hosts: targets
   gather_facts: true
   become: false
-  ignore_unreachable: true
 
   vars:
     zbxdeploy_facts_dir: /data/facts

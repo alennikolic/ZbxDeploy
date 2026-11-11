@@ -1,4 +1,5 @@
 <?php
+// src/Controller/DashboardController.php
 
 declare(strict_types=1);
 

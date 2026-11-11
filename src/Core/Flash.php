@@ -1,4 +1,5 @@
 <?php
+// src/Core/Flash.php
 
 declare(strict_types=1);
 

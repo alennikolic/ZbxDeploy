@@ -1,4 +1,5 @@
 <?php
+// src/Core/Csrf.php
 
 declare(strict_types=1);
 

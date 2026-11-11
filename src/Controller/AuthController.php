@@ -1,4 +1,5 @@
 <?php
+// src/Controller/AuthController.php
 
 declare(strict_types=1);
 

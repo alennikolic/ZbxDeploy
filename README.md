@@ -1,3 +1,4 @@
+<!-- README.md -->
 # ZbxDeploy
 
 **Deploy, configure and maintain Zabbix environments from one place.**

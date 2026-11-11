@@ -1,4 +1,5 @@
 <?php
+// bin/hash-password.php
 
 declare(strict_types=1);
 

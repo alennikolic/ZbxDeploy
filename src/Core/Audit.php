@@ -1,4 +1,5 @@
 <?php
+// src/Core/Audit.php
 
 declare(strict_types=1);
 

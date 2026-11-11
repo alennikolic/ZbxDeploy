@@ -1,3 +1,4 @@
+# ansible/playbooks/apply.yml
 ---
 # Apply the roles ZbxDeploy has assigned to each host.
 #
@@ -9,7 +10,6 @@
   hosts: targets
   gather_facts: true
   become: false
-  ignore_unreachable: true
 
   vars:
     zbxdeploy_results_dir: /data/results

@@ -1,3 +1,4 @@
+# docker/php/Dockerfile
 FROM php:8.3-fpm-bookworm
 
 ARG ANSIBLE_CORE_VERSION=2.17.*

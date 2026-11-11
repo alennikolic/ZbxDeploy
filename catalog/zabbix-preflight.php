@@ -1,4 +1,5 @@
 <?php
+// catalog/zabbix-preflight.php
 
 declare(strict_types=1);
 

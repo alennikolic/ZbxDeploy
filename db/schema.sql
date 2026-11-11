@@ -1,3 +1,4 @@
+-- db/schema.sql
 -- ZbxDeploy schema
 -- MySQL 8.x / MariaDB 10.11+
 -- Applied automatically on first container start (docker-entrypoint-initdb.d).

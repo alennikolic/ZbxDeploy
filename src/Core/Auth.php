@@ -1,4 +1,5 @@
 <?php
+// src/Core/Auth.php
 
 declare(strict_types=1);
 

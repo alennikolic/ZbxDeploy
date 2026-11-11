@@ -1,3 +1,4 @@
+# ansible/roles/zabbix-preflight/tasks/main.yml
 ---
 # Preflight: make the host a sane place to install a Zabbix component.
 #

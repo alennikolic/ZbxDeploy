@@ -1,3 +1,4 @@
+# ansible/roles/zabbix-preflight/defaults/main.yml
 ---
 # Parameters arrive as a single dict so the apply playbook can pass whatever
 # the catalogue manifest produced, without the role and the manifest having to

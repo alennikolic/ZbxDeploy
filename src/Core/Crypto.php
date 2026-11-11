@@ -1,4 +1,5 @@
 <?php
+// src/Core/Crypto.php
 
 declare(strict_types=1);
 

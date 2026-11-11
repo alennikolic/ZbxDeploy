@@ -1,3 +1,4 @@
+-- db/seed.sql
 -- ZbxDeploy seed data
 -- Version matrix. Adding a new Zabbix release or a new Ubuntu release is an
 -- INSERT here plus a template directory under ansible/templates/ — no PHP change.

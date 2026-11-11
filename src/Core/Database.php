@@ -1,4 +1,5 @@
 <?php
+// src/Core/Database.php
 
 declare(strict_types=1);
 

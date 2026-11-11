@@ -1,4 +1,5 @@
 <?php
+// src/Core/View.php
 
 declare(strict_types=1);
 
