@@ -21,7 +21,8 @@ return [
     'order'   => 20,
 
     // Without a codename there is no way to pick the right release package.
-    'requires_facts' => ['os_codename'],
+    'requires_facts'   => ['os_codename'],
+    'requires_release' => true,
 
     'params' => [
         'remove_distro_packages' => [

@@ -1,0 +1,18 @@
+# ansible/roles/zabbix-agent2/defaults/main.yml
+---
+zbx_params: {}
+
+# Injected by ZbxDeploy from the zabbix_versions table.
+zbx_version: "{{ zbx_params.zabbix_version | default('') }}"
+zbx_template_dir: "{{ zbx_params.template_dir | default('7.0') }}"
+
+# From the catalogue manifest.
+zbx_server: "{{ zbx_params.server | default('') }}"
+zbx_server_active: "{{ zbx_params.server_active | default('') }}"
+zbx_agent_hostname: "{{ zbx_params.agent_hostname | default('') or inventory_hostname }}"
+zbx_listen_port: "{{ zbx_params.listen_port | default(10050) | int }}"
+zbx_timeout: "{{ zbx_params.timeout | default(3) | int }}"
+zbx_allow_system_run: "{{ zbx_params.allow_system_run | default(false) | bool }}"
+
+zbx_config_path: /etc/zabbix/zabbix_agent2.conf
+zbx_include_dir: /etc/zabbix/zabbix_agent2.d

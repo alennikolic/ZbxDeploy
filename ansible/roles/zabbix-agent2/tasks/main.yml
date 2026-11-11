@@ -1,0 +1,98 @@
+# ansible/roles/zabbix-agent2/tasks/main.yml
+---
+# Install and configure Zabbix agent 2.
+#
+# This role owns /etc/zabbix/zabbix_agent2.conf: the file is rendered from the
+# template for this environment's Zabbix version, so changing a setting later
+# is the same operation as installing it the first time. Local additions belong
+# in the include directory, which the template preserves.
+
+- name: Refuse to run without a server address
+  ansible.builtin.assert:
+    that:
+      - zbx_server | length > 0
+    fail_msg: >-
+      No server address was given for the agent. Set "Server or proxy address"
+      on the role before applying.
+    quiet: true
+
+- name: Install zabbix-agent2
+  ansible.builtin.apt:
+    name: zabbix-agent2
+    state: present
+  become: true
+  register: zbx_agent_pkg
+
+- name: Make sure the include directory exists
+  ansible.builtin.file:
+    path: "{{ zbx_include_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+  check_mode: false
+
+- name: Render the agent configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/{{ zbx_template_dir }}/zabbix_agent2.conf.j2"
+    dest: "{{ zbx_config_path }}"
+    owner: root
+    group: zabbix
+    mode: '0640'
+    backup: true
+    validate: "zabbix_agent2 -c %s -t agent.ping"
+  become: true
+  notify: Restart zabbix-agent2
+
+- name: Enable and start zabbix-agent2
+  ansible.builtin.systemd_service:
+    name: zabbix-agent2
+    enabled: true
+    state: started
+  become: true
+
+# Handlers normally run at the end of the play; flush them here so the checks
+# below look at the agent as configured, not as it was before.
+- name: Apply any pending restart before verifying
+  ansible.builtin.meta: flush_handlers
+
+- name: Ask the agent to answer a trivial item
+  ansible.builtin.command:
+    cmd: "zabbix_agent2 -c {{ zbx_config_path }} -t agent.ping"
+  become: true
+  register: zbx_agent_ping
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Read the installed agent version
+  ansible.builtin.command:
+    cmd: zabbix_agent2 --version
+  register: zbx_agent_version
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Confirm the agent answers
+  ansible.builtin.assert:
+    that:
+      - zbx_agent_ping.rc | default(1) == 0
+    fail_msg: >-
+      zabbix-agent2 is installed but does not answer agent.ping locally.
+      Check {{ zbx_config_path }} and: journalctl -u zabbix-agent2 -n 50
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Report the agent state
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }}:
+      {% if ansible_check_mode %}
+      check mode - zabbix-agent2 was not actually installed or reconfigured.
+      {% else %}
+      {{ zbx_agent_version.stdout_lines[0] | default('zabbix-agent2') }},
+      hostname {{ zbx_agent_hostname }}, listening on {{ zbx_listen_port }},
+      allowed from {{ zbx_server }},
+      active checks {{ 'to ' ~ zbx_server_active if zbx_server_active | length > 0 else 'disabled' }}.
+      {% endif %}

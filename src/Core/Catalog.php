@@ -49,6 +49,10 @@ final class Catalog
                 'order'          => 500,
                 'ansible_role'   => $manifest['id'],
                 'requires_facts' => [],
+                // Roles that need the version matrix (repository URL, template
+                // directory) say so; the apply job then refuses to run them on
+                // a host with no matching zabbix_versions row.
+                'requires_release' => false,
                 'params'         => [],
             ];
 

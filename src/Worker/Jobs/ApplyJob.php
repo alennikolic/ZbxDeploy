@@ -125,6 +125,11 @@ final class ApplyJob
             'os_codename' => $host['os_codename'],
         ];
 
+        // Resolved once per host: the environment decides the Zabbix version,
+        // the host decides the Ubuntu codename. Roles that declare
+        // requires_release get it merged into their parameters.
+        $release = $this->resolveRelease($host);
+
         $plan = [];
 
         foreach ($assigned as $row) {
@@ -155,13 +160,27 @@ final class ApplyJob
 
             $roleParams = json_decode((string) ($row['params'] ?? '{}'), true) ?: [];
 
-            if ($roleId === 'zabbix-repo') {
-                $release = $this->resolveRelease($jobId, $host);
+            if (($manifest['requires_release'] ?? false) === true) {
                 if ($release === null) {
+                    JobQueue::log($jobId, sprintf(
+                        '%s: role "%s" needs a zabbix_versions entry for Zabbix %s on "%s", and there is none that is '
+                        . 'marked supported. Add the row (verify the repository URL against zabbix.com/download first).',
+                        $hostname,
+                        $roleId,
+                        (string) Database::scalar(
+                            'SELECT zabbix_version FROM environments WHERE id = :id',
+                            ['id' => $host['environment_id']]
+                        ),
+                        (string) $host['os_codename']
+                    ), 'system');
+
                     return null;
                 }
+
                 $roleParams['repo_deb_url'] = $release['repo_deb_url'];
                 $roleParams['zabbix_version'] = $release['zabbix_version'];
+                $roleParams['template_dir'] = $release['template_dir'];
+                $roleParams['sql_scripts_path'] = $release['sql_scripts_path'];
             }
 
             $plan[] = [
@@ -184,15 +203,15 @@ final class ApplyJob
     }
 
     /**
-     * Find the release package for this host: the environment decides the
-     * Zabbix version, the host decides the Ubuntu codename.
+     * The zabbix_versions row for this host, or null when there is none.
+     * Reporting is left to the caller, which knows which role needed it.
      *
      * @param array<string, mixed> $host
      * @return array<string, mixed>|null
      */
-    private function resolveRelease(int $jobId, array $host): ?array
+    private function resolveRelease(array $host): ?array
     {
-        $release = Database::one(
+        return Database::one(
             'SELECT v.* FROM zabbix_versions v
              JOIN environments e ON e.id = :env
              WHERE v.zabbix_version = e.zabbix_version
@@ -201,20 +220,6 @@ final class ApplyJob
              LIMIT 1',
             ['env' => $host['environment_id'], 'codename' => $host['os_codename']]
         );
-
-        if ($release === null) {
-            JobQueue::log($jobId, sprintf(
-                '%s: no supported entry in zabbix_versions for Zabbix %s on "%s". '
-                . 'Add the row (and verify the repository URL against zabbix.com/download) before applying.',
-                $host['hostname'],
-                Database::scalar('SELECT zabbix_version FROM environments WHERE id = :id', ['id' => $host['environment_id']]),
-                $host['os_codename']
-            ), 'system');
-
-            return null;
-        }
-
-        return $release;
     }
 
     /**

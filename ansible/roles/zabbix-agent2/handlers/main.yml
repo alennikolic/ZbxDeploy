@@ -1,0 +1,7 @@
+# ansible/roles/zabbix-agent2/handlers/main.yml
+---
+- name: Restart zabbix-agent2
+  ansible.builtin.systemd_service:
+    name: zabbix-agent2
+    state: restarted
+  become: true

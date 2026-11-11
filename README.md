@@ -32,9 +32,13 @@ means it can derive most parameters instead of asking you for them twice.
   whether Zabbix packages are already installed, and what the configured apt
   repositories would install. It changes nothing on the target.
 - **Role catalogue**: roles are declared by a manifest, and the parameter form
-  is built from it. Two roles ship today — `zabbix-preflight` (timezone, NTP,
-  capacity) and `zabbix-repo` (official repository, with the broken
-  `zabbix-tools` repository handled).
+  is built from it. Three roles ship today — `zabbix-preflight` (timezone, NTP,
+  capacity), `zabbix-repo` (official repository, with the broken `zabbix-tools`
+  repository handled) and `zabbix-agent2`.
+- **Configuration under the tool's control**: `zabbix_agent2.conf` is rendered
+  from a template chosen by the environment's Zabbix version, validated before
+  it is written, and re-rendered on every apply. Changing a setting later is
+  the same operation as installing.
 - **Apply with a dry run**: the apply job maps straight onto
   `ansible-playbook --check --diff`, so "show me what would change" is a
   checkbox, not a second code path.
@@ -266,11 +270,12 @@ infrastructure, not as an internal website.
 |---|---|
 | 1 ✅ | Container stack, schema, auth, job queue with live log, inventory, probe |
 | 2 ✅ | Role catalogue, apply job with dry run, `zabbix-preflight` and `zabbix-repo` |
-| 3 | `zabbix-agent2`, then `zabbix-db`, `zabbix-server`, `zabbix-frontend`; environment-wide deployment plan |
-| 4 | `zabbix-proxy`, PSK key generation and distribution, Zabbix API registration of hosts and proxies |
-| 5 | Config ownership: every `.conf` rendered from the database, drift detection, edit-and-reapply |
-| 6 | Firewall rules derived from the topology, with a commit-confirmed rollback timer |
-| 7 | Version upgrades as an ordinary job type |
+| 3 ✅ | `zabbix-agent2` with version-pinned config templates |
+| 4 | `zabbix-db`, `zabbix-server`, `zabbix-frontend`; environment-wide deployment plan |
+| 5 | `zabbix-proxy`, PSK key generation and distribution, Zabbix API registration of hosts and proxies |
+| 6 | Config ownership: every `.conf` rendered from the database, drift detection, edit-and-reapply |
+| 7 | Firewall rules derived from the topology, with a commit-confirmed rollback timer |
+| 8 | Version upgrades as an ordinary job type |
 
 Deliberately out of scope for now: Linux user account management, generic
 automation, and anything that is not in service of running Zabbix.
